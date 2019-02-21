@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>天气</title>
+  <link rel='stylesheet' href='../css/base.css' />
+  <style>
+    html, body{width:100%;height:100%;}
+    #container{width:100%;height:100%;}
+    .locationIcon{width:36px; height:36px;background-color:#fff;position:relative;top:-30px;}
+    .locationIcon>img{width:32px; height:32px;margin:2px;}
+    .weather-panel{position:absolute;top:50%;left:50%;margin-top:-90px;margin-left:-140px;width:280px;height:180px;
+    background-color:#fff;font-size:14px;border-radius:10px;box-shadow:2px 2px 2px #ccc;opacity:0.9;}
+    .weather-title{height:30px;line-height:30px;font-size:15px;font-weight:bold;text-align:center;}
+    .weather-content{padding-left:10px;}
+    .weather-content>div{padding-bottom: 5px;}
+    .loc-circle{width:50px;height:50px;border:1px solid #49B3F4;background-color:#64C7FA;opacity:0.5;position: relative;border-radius:50%;}
+    .loc-img{position:absolute;width:16px;height:16px;top:17px;left:17px;}
+  </style>
+</head>
+
+<body>
+  <div id="container"></div>
+  <div class="weather-panel">
+    <div class='weather-title'>天气信息</div>
+    <div class="weather-content">
+      <div>省/市: <span class="weather_pro"></span></div>
+      <div>区/县: <span class="weather_city"></span></div>
+      <div>天气：<span class="weather_weather"></span></div>
+      <div>风向：<span class="weather_wind"></span></div>
+      <div>温度：<span class="weather_temp"></span></div>
+      <div>报告时间：<span class="weather_time"></span></div>
+    </div>
+  </div>
+  <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.7&key=de96a8f42fbbff54328f8c0182df16e6"></script>
+  <script type="text/javascript">
+    var map = new AMap.Map('container', {
+      resizeEnable: true,
+      zoom: 13
+    })
+    var locationIcon = "<div class='locationIcon'><img src='./geolocation.png'/></div>"
+    AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], function () { //异步同时加载多个插件
+      var toolbar = new AMap.ToolBar()
+      map.addControl(toolbar) // 工具条
+      var scale = new AMap.Scale()
+      map.addControl(scale) // 比例尺
+    });
+    map.plugin('AMap.Geolocation', function () {
+      var geolocation = new AMap.Geolocation({
+        // 是否使用高精度定位，默认：true
+        enableHighAccuracy: true,
+        // 设置定位超时时间，默认：无穷大
+        timeout: 10000,
+        // 定位按钮的停靠位置的偏移量，默认：Pixel(10, 20)
+        buttonOffset: new AMap.Pixel(10, 20),
+        //  定位成功后调整地图视野范围使定位位置及精度范围视野内可见，默认：false
+        zoomToAccuracy: true,
+        //  定位按钮的排放位置,  RB表示右下
+        buttonPosition: 'LB',
+        // 自定义定位按钮
+        buttonDom: locationIcon
+      })
+      // 添加插件
+      map.addControl(geolocation)
+      geolocation.getCurrentPosition()
+      AMap.event.addListener(geolocation, 'complete', onComplete)
+      AMap.event.addListener(geolocation, 'error', onError)
+
+      function onComplete(data) {
+        // data是具体的定位信息
+        map.clearMap()
+        map.setZoom(16)
+        showWeather([data.position.lng, data.position.lat])
+      }
+
+      function onError(data) {
+        // 定位出错
+        alert('定位失败，请在手机上开启定位:设置->隐私->定位服务->找厕所->使用应用期间')
+      }
+    })
+
+    function showWeather(center) {
+      var marker = new AMap.Marker({
+        position: center, // 经纬度对象，也可以是经纬度构成的一维数组[116.39, 39.9]
+        content: "<div class='loc-circle'><img class='loc-img' src='./loc.png'/></div>"
+      });
+
+      // 将创建的点标记添加到已有的地图实例：
+      map.add(marker);
+      // 正向与逆向地理编码
+      AMap.plugin('AMap.Geocoder', function () {
+        var geocoder = new AMap.Geocoder({})
+        // 根据经纬度来获取城市信息
+        geocoder.getAddress(center, function (status, result) {
+          if (status === 'complete' && result.info === 'OK') {
+            // result为对应的地理位置详细信息
+            var district = result.regeocode.addressComponent.district
+            AMap.plugin('AMap.Weather', function () {
+              //创建天气查询实例
+              var weather = new AMap.Weather();
+              //执行实时天气信息查询
+              weather.getLive(district, function (err, result) {
+                if (err) {
+                  console.log(err)
+                } else {
+                  document.querySelector('.weather_pro').innerHTML = result.province;
+                  document.querySelector('.weather_city').innerHTML = result.city;
+                  document.querySelector('.weather_weather').innerHTML = result.weather;
+                  document.querySelector('.weather_wind').innerHTML = result.windDirection;
+                  document.querySelector('.weather_temp').innerHTML = result.temperature;
+                  document.querySelector('.weather_time').innerHTML = result.reportTime;
+                }
+              })
+            })
+          }
+        })
+      })
+    }
+
+  </script>
+</body>
+
+</html>

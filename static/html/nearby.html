@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>附近</title>
+  <link rel="stylesheet" href="../css/base.css">
+  </style>
+  <style>
+    html,body{width:100%;height:100%;}
+    #container {width: 100%;height: 100%;}
+    .locationIcon{background-color:#fff;width:36px;height:36px;top:-30px;position: relative;}
+    .locationIcon>img{width:32px;height:32px;margin: 2px;}
+    .loc_circle{width:50px;height:50px;border:2px solid #49B3F4;
+        border-radius:50px;background-color:#64C7FA;opacity:0.5;}
+    .loc_img{position:relative;left:17px;top:-34px;width:16px;height:16px;}
+    .makerStyle{width:50px;height:30px;line-height:30px;font-size:12px;background:#FF4814;color:#fff;text-align:center;}
+    .infoWindow{position:relative;width:280px;height:130px;font-size:13px;background:#fff;color:#888;text-indent:10px;box-shadow:2px 2px 2px#ccc;}
+    .info_title{height:30px;line-height:30px;margin-bottom:10px;color:#fff;background-color:#0090FF;}
+    .info_close{width: 20px;height: 20px;position:absolute;top:5px;right:20px;}
+    .info_close>img{width:20px;height:20px;}
+    .dis_span{color:#FA2D00;font-weight:bold;}
+  </style>
+  <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.12&key=de96a8f42fbbff54328f8c0182df16e6"></script>
+</head>
+
+<body>
+  <div id="container"></div>
+  <script type="text/javascript">
+    var isiPhone = navigator.userAgent.toLocaleLowerCase().match(/iPhone/i);
+    var map = new AMap.Map('container', {
+      resizeEnable: true,
+      zoom: 11
+    })
+
+    // 异步加载插件
+    AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], function () {
+      // 工具条，控制地图的缩放、平移等
+      var toolbar = new AMap.ToolBar()
+      map.addControl(toolbar);
+      // 比例尺
+      var scale = new AMap.Scale()
+      map.addControl(scale)
+    })
+    var walking = null
+    AMap.service('AMap.Walking', function () {
+      walking = new AMap.Walking({
+        map: map
+      })
+    })
+    var locationIcon = '<div class="locationIcon">' +
+      '<img src="./geolocation.png"/>' +
+      '</div>'
+
+    var onComplete = function (data) {
+      // 清除地图上所有添加的覆盖物
+      map.clearMap()
+      // 搜索并显示厕所信息(距离你多少米)，点击可显示当前位置到指定厕所的路径和厕所的相关信息，可以点击关闭
+      doSearch([data.position.lng, data.position.lat])
+    }
+
+    var onError = function () {
+      alert('定位失败，请在手机上开启定位:设置->隐私->定位服务->找厕所->使用应用期间')
+    }
+    // 定位
+    map.plugin('AMap.Geolocation', function () {
+      var geolocation = new AMap.Geolocation({
+        enableHighAccuracy: true, //是否使用高精度定位，默认:true
+        timeout: 10000, //超过10秒后停止定位，默认：无穷大
+        maximumAge: 0, //定位结果缓存0毫秒，默认：0
+        convert: true, //自动偏移坐标，偏移后的坐标为高德坐标，默认：true
+        showButton: true, //显示定位按钮，默认：true
+        buttonPosition: 'LB', //定位按钮停靠位置，默认：'LB'，左下角
+        buttonOffset: new AMap.Pixel(10, 20), //定位按钮与设置的停靠位置的偏移量，默认：Pixel(10, 20)
+        showMarker: true, //定位成功后在定位到的位置显示点标记，默认：true
+        showCircle: true, //定位成功后用圆圈表示定位精度范围，默认：true
+        panToLocation: true, //定位成功后将定位到的位置作为地图中心点，默认：true
+        zoomToAccuracy: true, //定位成功后调整地图视野范围使定位位置及精度范围视野内可见，默认：false
+        buttonDom: locationIcon //自定义定位按钮内容
+      })
+      map.addControl(geolocation)
+      geolocation.getCurrentPosition()
+      AMap.event.addListener(geolocation, 'complete', onComplete) //返回定位信息
+      AMap.event.addListener(geolocation, 'error', onError) //返回定位出错信息
+    })
+
+    function _closeInfoWindow() {
+      map.clearInfoWindow();
+    }
+
+    var doSearch = function (center) {
+      // 展示定位
+      var marker = new AMap.Marker({
+        position: center,
+        map: map,
+        content: '<div class="loc_circle"></div><img class="loc_img" src="./loc.png"/>'
+      });
+      // 地点搜索服务
+      AMap.service(["AMap.PlaceSearch"], function () {
+        var placeSearch = new AMap.PlaceSearch({
+          pageSize: 10,
+          extensions: "base",
+          // 兴趣点类别
+          type: '200300|200300|200302|200303'
+        })
+        placeSearch.searchNearBy("厕所", center, 1000, function (status, result) {
+          if (status === 'complete' && result.info === 'OK') {
+            var pois = result.poiList.pois;
+            pois.forEach(function (poi) {
+              var divStr = '<div class="makerStyle">' + poi.distance + '米</div>';
+              var info = '<div class="infoWindow"><div class="info_title">卫生间</div>' +
+                '<div class="info_name">名称: ' + poi.name + '</div>' +
+                '<div class="info_dis">距您: ' + '<span class="dis_span">' + poi.distance + '米</span>' +
+                '</div>' +
+                '<div class="info_address">地址: ' + poi.address + '</div>' +
+                '<div class="info_type">类型: ' + (poi.type || '卫生间') + '</div>' +
+                '<div class="info_arrow"></div>';
+              if (isiPhone && isiPhone.length) {
+                info +=
+                  '<div class="info_close" ontouchstart="_closeInfoWindow()"><img src="./close_blue.png" style=""/></div>' +
+                  '</div>';
+              } else {
+                info +=
+                  '<div class="info_close" onclick="_closeInfoWindow()"><img src="./close_blue.png" style=""/></div>' +
+                  '</div>';
+              }
+              // 点标记
+              var marker = new AMap.Marker({
+                position: poi.location,
+                title: poi['name'],
+                map: map,
+                content: divStr,
+                offset: new AMap.Pixel(10, -25)
+              });
+
+              function showInfo() {
+                // 点标记的信息窗口
+                var infowindow = new AMap.InfoWindow({
+                  content: info,
+                  offset: new AMap.Pixel(40, -35),
+                  isCustom: true
+                });
+                // 打开信息窗口
+                infowindow.open(map, poi.location);
+                //步行路径规划
+                walking.clear();
+                var start = new AMap.LngLat(center[0], center[1]);
+                var end = poi.location;
+                walking.search(start, end);
+              }
+
+              if (isiPhone && isiPhone.length) {
+                // 当点标记被点击时，设置并打开信息窗口
+                AMap.event.addListener(marker, 'touchstart', showInfo);
+              } else {
+                AMap.event.addListener(marker, 'click', showInfo);
+              }
+
+            });
+            // 设置地图的缩放级别
+            map.setZoom(16);
+          } else {
+            alert('该地点没有查询到相关数据');
+          }
+        });
+      });
+    }
+
+  </script>
+
+</body>
+
+</html>
